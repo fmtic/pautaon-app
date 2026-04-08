@@ -9,11 +9,13 @@ import {
   Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
 import { ScreenContainer } from '@/components/screen-container';
 import { useColors } from '@/hooks/use-colors';
 import { supabase } from '@/lib/supabase';
+
+const TIPOS_INFORMATIVO = ['período', 'reunião', 'formatura', 'autorização', 'evento', 'outro'];
 
 export default function AdminCreateScreen() {
   const router = useRouter();
@@ -21,39 +23,11 @@ export default function AdminCreateScreen() {
   const [titulo, setTitulo] = useState('');
   const [descricao, setDescricao] = useState('');
   const [resumo, setResumo] = useState('');
-  const [tipo, setTipo] = useState('informativo');
+  const [tipo, setTipo] = useState('período');
   const [local, setLocal] = useState('');
   const [dataEvento, setDataEvento] = useState('');
   const [horaEvento, setHoraEvento] = useState('');
-  const [alunoId, setAlunoId] = useState('');
-  const [alunos, setAlunos] = useState<any[]>([]);
-  const [carregando, setCarregando] = useState(false);
   const [salvando, setSalvando] = useState(false);
-
-  useEffect(() => {
-    buscarAlunos();
-  }, []);
-
-  const buscarAlunos = async () => {
-    try {
-      setCarregando(true);
-      const { data, error } = await supabase
-        .from('alunos')
-        .select('id, nome, matricula')
-        .order('nome');
-
-      if (error) throw error;
-      setAlunos(data || []);
-      if (data && data.length > 0) {
-        setAlunoId(data[0].id.toString());
-      }
-    } catch (err) {
-      console.error('Erro ao buscar alunos:', err);
-      Alert.alert('Erro', 'Não foi possível carregar alunos');
-    } finally {
-      setCarregando(false);
-    }
-  };
 
   const validarFormulario = () => {
     if (!titulo.trim()) {
@@ -62,10 +36,6 @@ export default function AdminCreateScreen() {
     }
     if (!descricao.trim()) {
       Alert.alert('Erro', 'Descrição é obrigatória');
-      return false;
-    }
-    if (!alunoId) {
-      Alert.alert('Erro', 'Selecione um aluno');
       return false;
     }
     return true;
@@ -82,10 +52,10 @@ export default function AdminCreateScreen() {
         resumo: resumo.trim() || null,
         tipo,
         local: local.trim() || null,
-        data_evento: dataEvento || null,
-        hora_evento: horaEvento || null,
-        aluno_id: parseInt(alunoId),
-        status: 'normal',
+        data_evento: dataEvento.trim() || null,
+        hora_evento: horaEvento.trim() || null,
+        aluno_id: null,
+        status: 'novo',
       });
 
       if (error) throw error;
@@ -99,8 +69,6 @@ export default function AdminCreateScreen() {
       setSalvando(false);
     }
   };
-
-  const tipos = ['informativo', 'reunião', 'formatura', 'autorização', 'evento'];
 
   return (
     <ScreenContainer className="p-0">
@@ -116,27 +84,27 @@ export default function AdminCreateScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
       >
-        <ScrollView contentContainerStyle={{ flexGrow: 1, padding: 16 }}>
+        <ScrollView
+          contentContainerStyle={{ flexGrow: 1, padding: 16 }}
+          keyboardShouldPersistTaps="handled"
+        >
           <View className="gap-4">
             {/* Título */}
             <View>
-              <Text className="text-sm font-semibold text-foreground mb-2">
-                Título *
-              </Text>
+              <Text className="text-sm font-semibold text-foreground mb-2">Título *</Text>
               <TextInput
                 placeholder="Ex: Reunião de Pais"
                 value={titulo}
                 onChangeText={setTitulo}
                 placeholderTextColor={colors.muted}
                 className="border border-border rounded-lg px-4 py-3 text-foreground bg-surface"
+                style={{ color: colors.foreground }}
               />
             </View>
 
             {/* Descrição */}
             <View>
-              <Text className="text-sm font-semibold text-foreground mb-2">
-                Descrição *
-              </Text>
+              <Text className="text-sm font-semibold text-foreground mb-2">Descrição *</Text>
               <TextInput
                 placeholder="Descreva o informativo em detalhes..."
                 value={descricao}
@@ -145,64 +113,58 @@ export default function AdminCreateScreen() {
                 multiline
                 numberOfLines={4}
                 className="border border-border rounded-lg px-4 py-3 text-foreground bg-surface"
-                textAlignVertical="top"
+                style={{ color: colors.foreground, textAlignVertical: 'top' }}
               />
             </View>
 
             {/* Resumo */}
             <View>
-              <Text className="text-sm font-semibold text-foreground mb-2">
-                Resumo (opcional)
-              </Text>
+              <Text className="text-sm font-semibold text-foreground mb-2">Resumo (opcional)</Text>
               <TextInput
                 placeholder="Resumo breve do informativo"
                 value={resumo}
                 onChangeText={setResumo}
                 placeholderTextColor={colors.muted}
                 className="border border-border rounded-lg px-4 py-3 text-foreground bg-surface"
+                style={{ color: colors.foreground }}
               />
             </View>
 
             {/* Tipo */}
             <View>
-              <Text className="text-sm font-semibold text-foreground mb-2">
-                Tipo
-              </Text>
-              <View className="flex-row flex-wrap gap-2">
-                {tipos.map((t) => (
+              <Text className="text-sm font-semibold text-foreground mb-2">Tipo</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ gap: 8 }}
+              >
+                {TIPOS_INFORMATIVO.map((t) => (
                   <TouchableOpacity
                     key={t}
                     onPress={() => setTipo(t)}
                     activeOpacity={0.7}
                     className={`px-4 py-2 rounded-full ${
-                      tipo === t
-                        ? 'bg-primary'
-                        : 'bg-surface border border-border'
+                      tipo === t ? 'bg-primary' : 'bg-surface border border-border'
                     }`}
                   >
-                    <Text
-                      className={`text-sm font-medium ${
-                        tipo === t ? 'text-white' : 'text-foreground'
-                      }`}
-                    >
+                    <Text className={`text-sm font-medium ${tipo === t ? 'text-white' : 'text-foreground'}`}>
                       {t.charAt(0).toUpperCase() + t.slice(1)}
                     </Text>
                   </TouchableOpacity>
                 ))}
-              </View>
+              </ScrollView>
             </View>
 
             {/* Local */}
             <View>
-              <Text className="text-sm font-semibold text-foreground mb-2">
-                Local (opcional)
-              </Text>
+              <Text className="text-sm font-semibold text-foreground mb-2">Local (opcional)</Text>
               <TextInput
                 placeholder="Ex: Sala de Aula 101"
                 value={local}
                 onChangeText={setLocal}
                 placeholderTextColor={colors.muted}
                 className="border border-border rounded-lg px-4 py-3 text-foreground bg-surface"
+                style={{ color: colors.foreground }}
               />
             </View>
 
@@ -217,6 +179,7 @@ export default function AdminCreateScreen() {
                 onChangeText={setDataEvento}
                 placeholderTextColor={colors.muted}
                 className="border border-border rounded-lg px-4 py-3 text-foreground bg-surface"
+                style={{ color: colors.foreground }}
               />
             </View>
 
@@ -231,43 +194,8 @@ export default function AdminCreateScreen() {
                 onChangeText={setHoraEvento}
                 placeholderTextColor={colors.muted}
                 className="border border-border rounded-lg px-4 py-3 text-foreground bg-surface"
+                style={{ color: colors.foreground }}
               />
-            </View>
-
-            {/* Aluno */}
-            <View>
-              <Text className="text-sm font-semibold text-foreground mb-2">
-                Aluno *
-              </Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                className="gap-2"
-                contentContainerStyle={{ gap: 8 }}
-              >
-                {alunos.map((aluno) => (
-                  <TouchableOpacity
-                    key={aluno.id}
-                    onPress={() => setAlunoId(aluno.id.toString())}
-                    activeOpacity={0.7}
-                    className={`px-4 py-2 rounded-full whitespace-nowrap ${
-                      alunoId === aluno.id.toString()
-                        ? 'bg-primary'
-                        : 'bg-surface border border-border'
-                    }`}
-                  >
-                    <Text
-                      className={`text-sm font-medium ${
-                        alunoId === aluno.id.toString()
-                          ? 'text-white'
-                          : 'text-foreground'
-                      }`}
-                    >
-                      {aluno.nome}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
             </View>
 
             {/* Botões */}
@@ -283,9 +211,7 @@ export default function AdminCreateScreen() {
                 onPress={handleCriar}
                 disabled={salvando}
                 activeOpacity={0.7}
-                className={`flex-1 rounded-lg py-3 items-center ${
-                  salvando ? 'bg-primary/50' : 'bg-primary'
-                }`}
+                className={`flex-1 rounded-lg py-3 items-center ${salvando ? 'bg-primary/50' : 'bg-primary'}`}
               >
                 <Text className="text-white font-semibold">
                   {salvando ? 'Criando...' : 'Criar'}

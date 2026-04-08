@@ -9,36 +9,30 @@ import { useAuth } from "@/lib/auth-context";
 export default function ProfileScreen() {
   const router = useRouter();
   const colors = useColors();
-  const { logout, usuario } = useAuth();
+  const { logout, usuario, alunos } = useAuth();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [emailNotifications, setEmailNotifications] = useState(true);
 
   const handleLogout = () => {
-    Alert.alert(
-      "Sair",
-      "Tem certeza que deseja sair da aplicação?",
-      [
-        { text: "Cancelar", onPress: () => {} },
-        {
-          text: "Sair",
-          onPress: async () => {
-            await logout();
-            router.replace('/login');
-          },
-          style: "destructive",
+    Alert.alert("Sair", "Tem certeza que deseja sair?", [
+      { text: "Cancelar" },
+      {
+        text: "Sair",
+        onPress: async () => {
+          await logout();
+          router.replace("/login");
         },
-      ]
-    );
+        style: "destructive",
+      },
+    ]);
   };
 
   const handleFalarComSecretaria = () => {
-    const phoneNumber = '5521972531909';
-    const message = 'Olá! Tenho uma dúvida sobre os informativos da escola.';
-    const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
-    
-    Linking.openURL(whatsappUrl).catch(() => {
-      Alert.alert('Erro', 'Não foi possível abrir o WhatsApp');
-    });
+    const phoneNumber = "5521972531909";
+    const message = "Olá! Tenho uma dúvida sobre os informativos da escola.";
+    Linking.openURL(
+      `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`
+    ).catch(() => Alert.alert("Erro", "Não foi possível abrir o WhatsApp"));
   };
 
   return (
@@ -53,81 +47,80 @@ export default function ProfileScreen() {
 
       <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
         <View className="px-6 py-6 gap-6">
-          {/* Responsável Info */}
+          {/* Dados do Usuário */}
           <View className="gap-3">
-            <Text className="text-sm font-semibold text-foreground">Responsável</Text>
+            <Text className="text-sm font-semibold text-foreground">
+              {usuario?.tipo_usuario === "admin" ? "Administrador" : "Responsável"}
+            </Text>
             <View className="bg-surface rounded-2xl p-4 gap-3">
               <View className="flex-row items-center gap-3">
                 <View className="w-12 h-12 rounded-full bg-primary items-center justify-center">
-                  <Text className="text-2xl">👤</Text>
+                  <Text className="text-2xl">
+                    {usuario?.tipo_usuario === "admin" ? "⚙️" : "👤"}
+                  </Text>
                 </View>
                 <View className="flex-1">
                   <Text className="text-base font-semibold text-foreground">
-                    João Silva
+                    {usuario?.nome || "—"}
                   </Text>
-                  <Text className="text-xs text-muted mt-1">Pai/Mãe</Text>
+                  <Text className="text-xs text-muted mt-1">
+                    {usuario?.tipo_usuario === "admin" ? "Admin" : "Responsável"}
+                  </Text>
                 </View>
               </View>
-              <View className="border-t border-border pt-3 gap-2">
+              <View className="border-t border-border pt-3">
                 <View className="flex-row items-center gap-2">
                   <Text className="text-xs text-muted w-16">Email:</Text>
                   <Text className="text-sm text-foreground flex-1">
-                    joao.silva@email.com
-                  </Text>
-                </View>
-                <View className="flex-row items-center gap-2">
-                  <Text className="text-xs text-muted w-16">Fone:</Text>
-                  <Text className="text-sm text-foreground">
-                    (11) 98765-4321
+                    {usuario?.email || "—"}
                   </Text>
                 </View>
               </View>
             </View>
           </View>
 
-          {/* Aluno Info */}
-          <View className="gap-3">
-            <Text className="text-sm font-semibold text-foreground">Aluno(a)</Text>
-            <View className="bg-surface rounded-2xl p-4 gap-3">
-              <View className="flex-row items-center gap-3">
-                <View className="w-12 h-12 rounded-full bg-primary items-center justify-center">
-                  <Text className="text-2xl">🎓</Text>
+          {/* Alunos vinculados (apenas para responsáveis) */}
+          {usuario?.tipo_usuario !== "admin" && alunos.length > 0 && (
+            <View className="gap-3">
+              <Text className="text-sm font-semibold text-foreground">
+                {alunos.length === 1 ? "Aluno" : "Alunos"}
+              </Text>
+              {alunos.map((aluno) => (
+                <View key={aluno.id} className="bg-surface rounded-2xl p-4 gap-2">
+                  <View className="flex-row items-center gap-3">
+                    <View className="w-10 h-10 rounded-full bg-primary items-center justify-center">
+                      <Text className="text-xl">🎓</Text>
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-base font-semibold text-foreground">
+                        {aluno.nome}
+                      </Text>
+                      <Text className="text-xs text-muted mt-1">{aluno.serie}</Text>
+                    </View>
+                  </View>
+                  <View className="border-t border-border pt-2">
+                    <View className="flex-row items-center gap-2">
+                      <Text className="text-xs text-muted w-20">Matrícula:</Text>
+                      <Text className="text-sm text-foreground font-semibold">
+                        {aluno.matricula}
+                      </Text>
+                    </View>
+                  </View>
                 </View>
-                <View className="flex-1">
-                  <Text className="text-base font-semibold text-foreground">
-                    Maria Silva
-                  </Text>
-                  <Text className="text-xs text-muted mt-1">
-                    Série: 3º Ano - Ensino Médio
-                  </Text>
-                </View>
-              </View>
-              <View className="border-t border-border pt-3 gap-2">
-                <View className="flex-row items-center gap-2">
-                  <Text className="text-xs text-muted w-20">Matrícula:</Text>
-                  <Text className="text-sm text-foreground font-semibold">
-                    2026001234
-                  </Text>
-                </View>
-                <View className="flex-row items-center gap-2">
-                  <Text className="text-xs text-muted w-20">Turma:</Text>
-                  <Text className="text-sm text-foreground">3º A</Text>
-                </View>
-              </View>
+              ))}
             </View>
-          </View>
+          )}
 
           {/* Notificações */}
           <View className="gap-3">
             <Text className="text-sm font-semibold text-foreground">
-              Preferências de Notificações
+              Notificações
             </Text>
             <View className="bg-surface rounded-2xl p-4 gap-4">
-              {/* Push Notifications */}
               <View className="flex-row items-center justify-between">
                 <View className="flex-1">
                   <Text className="text-base font-medium text-foreground">
-                    Notificações Push
+                    Push
                   </Text>
                   <Text className="text-xs text-muted mt-1">
                     Receba alertas em tempo real
@@ -137,15 +130,12 @@ export default function ProfileScreen() {
                   value={notificationsEnabled}
                   onValueChange={setNotificationsEnabled}
                   trackColor={{ false: colors.border, true: colors.primary }}
-                  thumbColor={notificationsEnabled ? colors.primary : colors.muted}
                 />
               </View>
-
-              {/* Email Notifications */}
               <View className="border-t border-border pt-4 flex-row items-center justify-between">
                 <View className="flex-1">
                   <Text className="text-base font-medium text-foreground">
-                    Notificações por Email
+                    Email
                   </Text>
                   <Text className="text-xs text-muted mt-1">
                     Resumo semanal de eventos
@@ -155,59 +145,32 @@ export default function ProfileScreen() {
                   value={emailNotifications}
                   onValueChange={setEmailNotifications}
                   trackColor={{ false: colors.border, true: colors.primary }}
-                  thumbColor={emailNotifications ? colors.primary : colors.muted}
                 />
               </View>
             </View>
           </View>
 
-          {/* Sobre */}
-          <View className="gap-3">
-            <Text className="text-sm font-semibold text-foreground">Sobre</Text>
-            <View className="bg-surface rounded-2xl p-4 gap-3">
-              <View className="flex-row items-center justify-between pb-3 border-b border-border">
-                <Text className="text-sm text-foreground">Versão do App</Text>
-                <Text className="text-sm font-semibold text-primary">1.0.0</Text>
-              </View>
-              <TouchableOpacity className="py-2">
-                <Text className="text-sm text-primary font-medium">
-                  Política de Privacidade
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity className="py-2">
-                <Text className="text-sm text-primary font-medium">
-                  Termos de Uso
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity className="py-2">
-                <Text className="text-sm text-primary font-medium">
-                  Entre em Contato
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Admin Dashboard Button */}
-          {usuario?.tipo_usuario === 'admin' && (
+          {/* Admin Dashboard */}
+          {usuario?.tipo_usuario === "admin" && (
             <TouchableOpacity
-              onPress={() => router.push('/admin-dashboard')}
+              onPress={() => router.push("/admin-dashboard")}
               activeOpacity={0.7}
-              className="bg-warning rounded-xl py-4 items-center mb-4"
+              className="bg-warning rounded-xl py-4 items-center"
             >
               <Text className="text-white font-semibold">⚙️ Painel Admin</Text>
             </TouchableOpacity>
           )}
 
-          {/* WhatsApp Button */}
+          {/* WhatsApp */}
           <TouchableOpacity
             onPress={handleFalarComSecretaria}
             activeOpacity={0.7}
-            className="bg-primary rounded-xl py-4 items-center mb-4"
+            className="bg-primary rounded-xl py-4 items-center"
           >
             <Text className="text-white font-semibold">💬 Fale com a Secretaria</Text>
           </TouchableOpacity>
 
-          {/* Logout Button */}
+          {/* Logout */}
           <TouchableOpacity
             onPress={handleLogout}
             activeOpacity={0.7}
