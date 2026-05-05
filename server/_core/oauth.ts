@@ -171,4 +171,97 @@ export function registerOAuthRoutes(app: Express) {
       res.status(401).json({ error: "Invalid token" });
     }
   });
+
+  // Google OAuth endpoint for mobile app
+  // Validates Google access token and creates/updates user in Supabase
+  app.post("/auth/google", async (req: Request, res: Response) => {
+    try {
+      const { accessToken } = req.body;
+
+      if (!accessToken) {
+        res.status(400).json({ error: "accessToken is required" });
+        return;
+      }
+
+      // Validate Google token and get user info
+      const googleResponse = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      if (!googleResponse.ok) {
+        res.status(401).json({ error: "Invalid Google token" });
+        return;
+      }
+
+      const googleUser = await googleResponse.json();
+
+      // Import Supabase client
+      const { createClient } = await import("@supabase/supabase-js");
+      const supabaseUrl = process.env.SUPABASE_URL;
+      const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+      if (!supabaseUrl || !supabaseServiceKey) {
+        res.status(500).json({ error: "Supabase configuration missing" });
+        return;
+      }
+
+      const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+      // Check if user exists in Supabase
+      const { data: existingUser, error: selectError } = await supabase
+        .from("usuarios")
+        .select("*")
+        .eq("email", googleUser.email)
+        .single();
+
+      let usuario;
+
+      if (selectError && selectError.code !== "PGRST116") {
+        // PGRST116 means no rows returned, which is expected for new users
+        throw selectError;
+      }
+
+      if (existingUser) {
+        // Update existing user
+        const { data: updatedUser, error: updateError } = await supabase
+          .from("usuarios")
+          .update({
+            nome: googleUser.name || existingUser.nome,
+            google_id: googleUser.id,
+            atualizado_em: new Date().toISOString(),
+          })
+          .eq("email", googleUser.email)
+          .select()
+          .single();
+
+        if (updateError) throw updateError;
+        usuario = updatedUser;
+      } else {
+        // Create new user
+        const { data: newUser, error: insertError } = await supabase
+          .from("usuarios")
+          .insert({
+            email: googleUser.email,
+            nome: googleUser.name || "Usuário",
+            google_id: googleUser.id,
+            tipo_usuario: "responsavel",
+            primeiro_login: false,
+            criado_em: new Date().toISOString(),
+            atualizado_em: new Date().toISOString(),
+          })
+          .select()
+          .single();
+
+        if (insertError) throw insertError;
+        usuario = newUser;
+      }
+
+      res.json(usuario);
+    } catch (error) {
+      console.error("[Auth] Google OAuth failed:", error);
+      res.status(500).json({ error: "Google OAuth failed" });
+    }
+  });
 }

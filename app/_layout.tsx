@@ -19,6 +19,8 @@ import type { EdgeInsets, Metrics, Rect } from "react-native-safe-area-context";
 import { trpc, createTRPCClient } from "@/lib/trpc";
 import { initManusRuntime, subscribeSafeAreaInsets } from "@/lib/_core/manus-runtime";
 import { AuthProvider } from "@/lib/auth-context";
+import * as Notifications from 'expo-notifications';
+import { supabase } from "@/lib/supabase";
 
 const DEFAULT_WEB_INSETS: EdgeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
 const DEFAULT_WEB_FRAME: Rect = { x: 0, y: 0, width: 0, height: 0 };
@@ -37,6 +39,41 @@ function RootLayoutContent() {
   // Initialize Manus runtime for cookie injection from parent container
   useEffect(() => {
     initManusRuntime();
+  }, []);
+
+  // Registrar token de notificacao ao iniciar o app
+  useEffect(() => {
+    const registrarTokenNotificacao = async () => {
+      try {
+        // Solicitar permissao de notificacao
+        const { status } = await Notifications.requestPermissionsAsync();
+        if (status !== 'granted') {
+          console.warn('Permissao de notificacao nao concedida');
+          return;
+        }
+
+        // Obter token do dispositivo
+        const token = (await Notifications.getExpoPushTokenAsync()).data;
+        console.log('Token de notificacao:', token);
+
+        // Salvar token no Supabase
+        const { error } = await supabase.from('notification_tokens').insert({
+          token,
+          plataforma: Platform.OS as 'ios' | 'android' | 'web',
+          ativo: true,
+        });
+
+        if (error) {
+          console.warn('Erro ao salvar token:', error);
+        }
+      } catch (err) {
+        console.warn('Erro ao registrar token de notificacao:', err);
+      }
+    };
+
+    if (Platform.OS !== 'web') {
+      registrarTokenNotificacao();
+    }
   }, []);
 
   const handleSafeAreaUpdate = useCallback((metrics: Metrics) => {

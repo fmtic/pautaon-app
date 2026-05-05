@@ -1,4 +1,4 @@
-import { ScrollView, Text, View, TouchableOpacity, Switch, Alert, Linking } from "react-native";
+import { Alert, Linking, ScrollView, Text, TouchableOpacity, View, Switch } from "react-native";
 import { useState } from "react";
 import { useRouter } from "expo-router";
 

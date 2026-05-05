@@ -100,3 +100,49 @@
 - [ ] Adaptar Home para mostrar todos os informativos (não filtrados por aluno)
 - [ ] Remover seletor de aluno na Home (se informativos são gerais)
 - [ ] Testar fluxo completo
+
+
+## Fase 13: Sincronização com GitHub e Melhorias UI
+- [x] Sincronizar mudanças do repositório GitHub (fmtic/pautaon-app)
+- [x] Integrar nova tela admin-usuarios.tsx
+- [x] Atualizar admin-dashboard.tsx com resumo de dados
+- [x] Melhorar profile.tsx com dados do usuário e alunos
+- [x] Corrigir importações duplicadas
+- [x] Validar TypeScript sem erros
+
+
+## Fase 14: Correção de Bugs e Melhorias de UX
+- [x] Desabilitar RLS na tabela informativos (temporário)
+- [x] Remover restrição aluno_id NOT NULL (usar aluno_id: 1 como padrão)
+- [x] Melhorar campo de data para formato dd/mm/aaaa com auto-formatação
+- [x] Melhorar campo de hora para formato HH:MM (24h) com validação
+- [x] Integrar Supabase Auth no fluxo de login customizado
+- [ ] Testar criação de informativo com novos campos
+- [ ] Testar edição de informativo
+- [ ] Testar deleção de informativo
+- [ ] Validar fluxo completo de admin
+
+
+## Fase 15: Notificações Push Imediatas
+- [x] Corrigir formatação de data para dd/mm/aaaa
+- [x] Melhorar formatação automática de hora (sem precisar digitar :)
+- [x] Criar interface NotificationToken
+- [x] Implementar funcao enviarNotificacaoParaTodos
+- [x] Adicionar chamada de notificacao ao criar informativo
+- [x] Registrar token de notificacao ao iniciar o app
+- [ ] Criar tabela notification_tokens no Supabase
+- [ ] Testar envio de notificacoes
+
+
+## Fase 16: Google OAuth e Simplificação de Usuários
+- [x] Remover tabela alunos (usar apenas usuarios)
+- [x] Remover tela select-student.tsx
+- [x] Atualizar AuthContext para suportar Google OAuth
+- [x] Instalar expo-auth-session
+- [x] Adicionar botão "Entrar com Google" na tela de login
+- [x] Criar endpoint /auth/google no backend
+- [x] Validar token Google e criar/atualizar usuário no Supabase
+- [x] Configurar variáveis de ambiente (SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+- [x] Testar credenciais Supabase
+- [ ] Testar fluxo completo de login com Google
+- [ ] Testar fluxo completo de login com email + senha

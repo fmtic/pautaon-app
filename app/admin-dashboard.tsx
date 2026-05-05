@@ -1,10 +1,11 @@
-import { ScrollView, Text, View, TouchableOpacity, Alert, FlatList } from 'react-native';
+import { Alert, FlatList, ScrollView, Text, TouchableOpacity, View, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useState, useEffect } from 'react';
 
 import { ScreenContainer } from '@/components/screen-container';
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase';
+import { useColors } from '@/hooks/use-colors';
 
 export default function AdminDashboardScreen() {
   const router = useRouter();

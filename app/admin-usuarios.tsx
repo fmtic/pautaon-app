@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useState, useEffect } from 'react';
 

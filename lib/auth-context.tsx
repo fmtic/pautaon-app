@@ -91,6 +91,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error('Email ou senha incorretos');
       }
 
+      // Integrar com Supabase Auth para que auth.email() funcione nas políticas RLS
+      try {
+        const { error: authError } = await supabase.auth.signInWithPassword({
+          email,
+          password: senha,
+        });
+        
+        if (authError) {
+          console.warn('Aviso: Supabase Auth falhou, continuando com login customizado:', authError.message);
+          // Continuar mesmo se Supabase Auth falhar, pois estamos usando login customizado
+        }
+      } catch (authErr) {
+        console.warn('Aviso: Erro ao integrar com Supabase Auth:', authErr);
+        // Continuar mesmo se houver erro
+      }
+
       // Salvar usuário na memória e AsyncStorage
       setUsuario(usuariosData);
       await AsyncStorage.setItem('usuario', JSON.stringify(usuariosData));
@@ -169,6 +185,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = async () => {
     try {
       setCarregando(true);
+      
+      // Desconectar do Supabase Auth
+      try {
+        await supabase.auth.signOut();
+      } catch (authErr) {
+        console.warn('Aviso: Erro ao desconectar do Supabase Auth:', authErr);
+      }
+      
       setUsuario(null);
       setAlunos([]);
       setAlunoSelecionado(null);

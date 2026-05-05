@@ -13,13 +13,15 @@ import { useState } from 'react';
 
 import { ScreenContainer } from '@/components/screen-container';
 import { useColors } from '@/hooks/use-colors';
-import { supabase } from '@/lib/supabase';
+import { supabase, enviarNotificacaoParaTodos } from '@/lib/supabase';
+import { useAuth } from '@/lib/auth-context';
 
 const TIPOS_INFORMATIVO = ['período', 'reunião', 'formatura', 'autorização', 'evento', 'outro'];
 
 export default function AdminCreateScreen() {
   const router = useRouter();
   const colors = useColors();
+  const { usuario } = useAuth();
   const [titulo, setTitulo] = useState('');
   const [descricao, setDescricao] = useState('');
   const [resumo, setResumo] = useState('');
@@ -28,6 +30,60 @@ export default function AdminCreateScreen() {
   const [dataEvento, setDataEvento] = useState('');
   const [horaEvento, setHoraEvento] = useState('');
   const [salvando, setSalvando] = useState(false);
+
+  // Manter data em formato dd/mm/aaaa (não converter para ISO)
+  const validarData = (data: string) => {
+    if (!data) return null;
+    const match = data.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (!match) return null;
+    const [, dia, mes, ano] = match;
+    // Validar se é uma data válida
+    const date = new Date(`${ano}-${mes}-${dia}`);
+    if (isNaN(date.getTime())) return null;
+    return data; // Retorna no formato dd/mm/aaaa
+  };
+
+  // Validar e formatar data dd/mm/aaaa
+  const handleDataChange = (text: string) => {
+    // Remove caracteres não numéricos
+    const numeros = text.replace(/\D/g, '');
+    
+    // Formata como dd/mm/aaaa
+    let formatado = numeros;
+    if (numeros.length >= 2) {
+      formatado = numeros.slice(0, 2) + '/' + numeros.slice(2);
+    }
+    if (numeros.length >= 4) {
+      formatado = numeros.slice(0, 2) + '/' + numeros.slice(2, 4) + '/' + numeros.slice(4, 8);
+    }
+    
+    setDataEvento(formatado);
+  };
+
+  // Validar e formatar hora HH:MM (24h) - insere : automaticamente
+  const handleHoraChange = (text: string) => {
+    // Remove caracteres nao numericos
+    const numeros = text.replace(/\D/g, '');
+    
+    // Limita a 4 digitos (HHMM)
+    const limitado = numeros.slice(0, 4);
+    
+    // Valida horas (00-23)
+    let hora = limitado.slice(0, 2);
+    if (hora && parseInt(hora) > 23) hora = '23';
+    
+    // Valida minutos (00-59)
+    let minuto = limitado.slice(2, 4);
+    if (minuto && parseInt(minuto) > 59) minuto = '59';
+    
+    // Formata automaticamente com : apos 2 digitos
+    let formatado = hora;
+    if (limitado.length > 2) {
+      formatado = hora + ':' + minuto;
+    }
+    
+    setHoraEvento(formatado);
+  };
 
   const validarFormulario = () => {
     if (!titulo.trim()) {
@@ -46,19 +102,53 @@ export default function AdminCreateScreen() {
 
     try {
       setSalvando(true);
+      // Validar data
+      const dataValida = validarData(dataEvento.trim());
+      if (dataEvento.trim() && !dataValida) {
+        Alert.alert('Erro', 'Data inválida. Use o formato dd/mm/aaaa');
+        setSalvando(false);
+        return;
+      }
+
+      // Validar hora
+      if (horaEvento.trim() && !/^([01]\d|2[0-3]):[0-5]\d$/.test(horaEvento.trim())) {
+        Alert.alert('Erro', 'Hora inválida. Use o formato HH:MM (24h)');
+        setSalvando(false);
+        return;
+      }
+
       const { error } = await supabase.from('informativos').insert({
         titulo: titulo.trim(),
         descricao: descricao.trim(),
         resumo: resumo.trim() || null,
         tipo,
         local: local.trim() || null,
-        data_evento: dataEvento.trim() || null,
+        data_evento: dataValida,
         hora_evento: horaEvento.trim() || null,
         aluno_id: null,
         status: 'novo',
+        admin_email: usuario?.email || null,
+        criado_em: new Date().toISOString(),
+        atualizado_em: new Date().toISOString(),
       });
 
       if (error) throw error;
+
+      // Enviar notificacao para todos os usuarios
+      try {
+        await enviarNotificacaoParaTodos(
+          `Novo Informativo: ${titulo.trim()}`,
+          descricao.trim(),
+          {
+            tipo: tipo,
+            data_evento: dataValida,
+            hora_evento: horaEvento.trim() || null,
+          }
+        );
+      } catch (notifErr) {
+        console.warn('Aviso: Erro ao enviar notificacao:', notifErr);
+        // Nao bloqueia a criacao do informativo se a notificacao falhar
+      }
 
       Alert.alert('Sucesso', 'Informativo criado com sucesso!');
       router.back();
@@ -174,10 +264,12 @@ export default function AdminCreateScreen() {
                 Data do Evento (opcional)
               </Text>
               <TextInput
-                placeholder="YYYY-MM-DD"
+                placeholder="dd/mm/aaaa"
                 value={dataEvento}
-                onChangeText={setDataEvento}
+                onChangeText={handleDataChange}
                 placeholderTextColor={colors.muted}
+                keyboardType="numeric"
+                maxLength={10}
                 className="border border-border rounded-lg px-4 py-3 text-foreground bg-surface"
                 style={{ color: colors.foreground }}
               />
@@ -189,10 +281,12 @@ export default function AdminCreateScreen() {
                 Hora do Evento (opcional)
               </Text>
               <TextInput
-                placeholder="HH:MM"
+                placeholder="HH:MM (24h)"
                 value={horaEvento}
-                onChangeText={setHoraEvento}
+                onChangeText={handleHoraChange}
                 placeholderTextColor={colors.muted}
+                keyboardType="numeric"
+                maxLength={5}
                 className="border border-border rounded-lg px-4 py-3 text-foreground bg-surface"
                 style={{ color: colors.foreground }}
               />
