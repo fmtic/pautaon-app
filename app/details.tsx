@@ -1,58 +1,53 @@
-import { ScrollView, Text, View, TouchableOpacity, Alert, Linking } from 'react-native';
+import {
+  ScrollView,
+  Text,
+  View,
+  TouchableOpacity,
+  Alert,
+  Linking,
+  ActivityIndicator,
+} from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 import { ScreenContainer } from '@/components/screen-container';
 import { useColors } from '@/hooks/use-colors';
-import { mockInformativos } from '@/lib/mock-data';
-import { InformativoCategory } from '@/lib/types';
+import { supabase, type Informativo } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 
-/**
- * Mapa de emojis para categorias
- */
-const categoryEmojis: Record<InformativoCategory, string> = {
-  periodo: '📅',
-  reuniao: '👥',
-  formatura: '🎓',
-  autorizacao: '✅',
-  evento: '🔔',
+const tipoEmojis: Record<string, string> = {
+  'período': '📅',
+  'reunião': '👥',
+  'formatura': '🎓',
+  'autorização': '✅',
+  'evento': '🔔',
+  'outro': '📌',
 };
 
-/**
- * Rótulos para categorias
- */
-const categoryLabels: Record<InformativoCategory, string> = {
-  periodo: 'Período Letivo',
-  reuniao: 'Reunião',
-  formatura: 'Formatura',
-  autorizacao: 'Autorização',
-  evento: 'Evento',
-};
-
-/**
- * Cores para badges de status
- */
-const statusColors = {
+const statusColors: Record<string, string> = {
   novo: '#3B82F6',
   importante: '#F59E0B',
   urgente: '#EF4444',
   normal: '#687076',
 };
 
-/**
- * Componente de Botão de Ação
- */
+const statusLabels: Record<string, string> = {
+  novo: 'Novo',
+  importante: 'Importante',
+  urgente: 'Urgente',
+  normal: 'Normal',
+};
+
 function ActionButton({
   label,
   onPress,
   variant = 'primary',
-  colors,
+  disabled = false,
 }: {
   label: string;
   onPress: () => void;
   variant?: 'primary' | 'secondary';
-  colors: ReturnType<typeof useColors>;
+  disabled?: boolean;
 }) {
   const isPrimary = variant === 'primary';
 
@@ -60,16 +55,16 @@ function ActionButton({
     <TouchableOpacity
       onPress={onPress}
       activeOpacity={0.7}
+      disabled={disabled}
+      style={{ opacity: disabled ? 0.6 : 1 }}
     >
       <View
-        className={`py-3 px-4 rounded-lg items-center justify-center ${
-          isPrimary ? 'bg-primary' : 'bg-background border border-border'
-        }`}
+        className={`py-3 px-4 rounded-lg items-center justify-center ${isPrimary ? 'bg-primary' : 'bg-background border border-border'
+          }`}
       >
         <Text
-          className={`font-semibold text-base ${
-            isPrimary ? 'text-white' : 'text-foreground'
-          }`}
+          className={`font-semibold text-base ${isPrimary ? 'text-white' : 'text-foreground'
+            }`}
         >
           {label}
         </Text>
@@ -78,61 +73,51 @@ function ActionButton({
   );
 }
 
-/**
- * Details Screen - Detalhes do Informativo
- */
 export default function DetailsScreen() {
   const router = useRouter();
   const colors = useColors();
   const { isAdmin } = useAuth();
   const { id } = useLocalSearchParams<{ id: string }>();
+
+  const [informativo, setInformativo] = useState<Informativo | null>(null);
+  const [carregando, setCarregando] = useState(true);
   const [confirmado, setConfirmado] = useState(false);
   const [autorizacaoEnviada, setAutorizacaoEnviada] = useState(false);
 
-  // Encontrar o informativo
-  const informativo = mockInformativos.find((info) => info.id === id);
+  useEffect(() => {
+    if (id) buscarInformativo();
+  }, [id]);
 
-  if (!informativo) {
-    return (
-      <ScreenContainer className="items-center justify-center">
-        <Text className="text-lg font-semibold text-foreground">
-          Informativo não encontrado
-        </Text>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          activeOpacity={0.7}
-        >
-          <Text className="text-primary font-semibold mt-4">Voltar</Text>
-        </TouchableOpacity>
-      </ScreenContainer>
-    );
-  }
+  const buscarInformativo = async () => {
+    try {
+      setCarregando(true);
+      const { data, error } = await supabase
+        .from('informativos')
+        .select('*')
+        .eq('id', id)
+        .single();
 
-  const categoryLabel = categoryLabels[informativo.categoria];
-  const statusColor = statusColors[informativo.status];
-
-  const formattedDate = informativo.data.toLocaleDateString('pt-BR', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
-  });
-
-  const formattedTime = informativo.data.toLocaleTimeString('pt-BR', {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+      if (error) throw error;
+      setInformativo(data);
+    } catch (err) {
+      console.error('Erro ao buscar informativo:', err);
+      Alert.alert('Erro', 'Não foi possível carregar o informativo');
+    } finally {
+      setCarregando(false);
+    }
+  };
 
   const handleConfirmarPresenca = () => {
     Alert.alert(
       'Confirmar Presença',
       'Você confirma sua presença neste evento?',
       [
-        { text: 'Cancelar', onPress: () => {} },
+        { text: 'Cancelar' },
         {
           text: 'Confirmar',
           onPress: () => {
             setConfirmado(true);
-            Alert.alert('Sucesso', 'Presença confirmada com sucesso!');
+            Alert.alert('Sucesso', 'Presença confirmada!');
           },
         },
       ]
@@ -142,14 +127,14 @@ export default function DetailsScreen() {
   const handleEnviarAutorizacao = () => {
     Alert.alert(
       'Enviar Autorização',
-      'Você autoriza a participação do aluno nesta atividade?',
+      'Você autoriza a participação nesta atividade?',
       [
-        { text: 'Cancelar', onPress: () => {} },
+        { text: 'Cancelar' },
         {
           text: 'Autorizar',
           onPress: () => {
             setAutorizacaoEnviada(true);
-            Alert.alert('Sucesso', 'Autorização enviada com sucesso!');
+            Alert.alert('Sucesso', 'Autorização enviada!');
           },
         },
       ]
@@ -157,60 +142,102 @@ export default function DetailsScreen() {
   };
 
   const handleAdicionarCalendario = () => {
-    Alert.alert('Sucesso', 'Evento adicionado ao calendário!');
+    Alert.alert('Calendário', 'Evento adicionado ao calendário!');
   };
 
   const handleFalarComSecretaria = () => {
+    if (!informativo) return;
     const phoneNumber = '5521972531909';
     const message = `Olá! Tenho uma dúvida sobre o informativo: ${informativo.titulo}`;
-    const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
-    
-    Linking.openURL(whatsappUrl).catch(() => {
-      Alert.alert('Erro', 'Não foi possível abrir o WhatsApp');
-    });
+    Linking.openURL(
+      `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`
+    ).catch(() => Alert.alert('Erro', 'Não foi possível abrir o WhatsApp'));
+  };
+
+  if (carregando) {
+    return (
+      <ScreenContainer className="items-center justify-center">
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text className="text-muted mt-3 text-sm">Carregando...</Text>
+      </ScreenContainer>
+    );
+  }
+
+  if (!informativo) {
+    return (
+      <ScreenContainer className="items-center justify-center">
+        <Text className="text-4xl mb-4">😕</Text>
+        <Text className="text-lg font-semibold text-foreground">
+          Informativo não encontrado
+        </Text>
+        <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7}>
+          <Text className="text-primary font-semibold mt-4">Voltar</Text>
+        </TouchableOpacity>
+      </ScreenContainer>
+    );
+  }
+
+  const statusColor = statusColors[informativo.status] || statusColors.normal;
+  const statusLabel = statusLabels[informativo.status] || informativo.status;
+  const emoji = tipoEmojis[informativo.tipo] || '📌';
+  const tipoLabel =
+    (informativo.tipo || '').charAt(0).toUpperCase() +
+    (informativo.tipo || '').slice(1);
+
+  const formatarData = () => {
+    if (!informativo.data_evento) return null;
+    try {
+      return new Date(informativo.data_evento).toLocaleDateString('pt-BR', {
+        day: '2-digit',
+        month: 'long',
+        year: 'numeric',
+      });
+    } catch {
+      return informativo.data_evento;
+    }
   };
 
   return (
     <ScreenContainer className="p-0">
       {/* Header */}
-      <View className="px-6 pt-4 pb-4 bg-background border-b border-border flex-row items-center justify-between">
-        <TouchableOpacity
-          onPress={() => router.back()}
-          activeOpacity={0.7}
-        >
+      <View className="px-6 pt-4 pb-4 bg-background border-b border-border flex-row items-center">
+        <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7}>
           <Text className="text-2xl">←</Text>
         </TouchableOpacity>
         <Text className="text-lg font-bold text-foreground flex-1 ml-3">
           Detalhes
         </Text>
+        {isAdmin && (
+          <TouchableOpacity
+            onPress={() =>
+              router.push({ pathname: '/admin-edit', params: { id: informativo.id } })
+            }
+            activeOpacity={0.7}
+            className="bg-primary/10 px-3 py-1 rounded-full"
+          >
+            <Text className="text-primary font-semibold text-sm">✏️ Editar</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
-      {/* Conteúdo */}
       <ScrollView
-        contentContainerStyle={{
-          paddingHorizontal: 24,
-          paddingVertical: 16,
-        }}
+        contentContainerStyle={{ paddingHorizontal: 24, paddingVertical: 16 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Categoria e Status */}
+        {/* Tipo e Status */}
         <View className="flex-row items-center gap-3 mb-4">
-          <View className="w-12 h-12 rounded-lg bg-background items-center justify-center">
-            <Text className="text-2xl">{categoryEmojis[informativo.categoria]}</Text>
+          <View className="w-12 h-12 rounded-lg bg-surface border border-border items-center justify-center">
+            <Text className="text-2xl">{emoji}</Text>
           </View>
           <View className="flex-1">
-            <Text className="text-sm font-semibold text-muted">{categoryLabel}</Text>
+            <Text className="text-sm font-semibold text-primary">{tipoLabel}</Text>
             {informativo.status !== 'normal' && (
               <View
                 className="mt-1 px-2 py-1 rounded-full self-start"
                 style={{ backgroundColor: statusColor }}
               >
                 <Text className="text-xs font-semibold text-white">
-                  {informativo.status === 'novo'
-                    ? 'Novo'
-                    : informativo.status === 'importante'
-                      ? 'Importante'
-                      : 'Urgente'}
+                  {statusLabel.toUpperCase()}
                 </Text>
               </View>
             )}
@@ -223,30 +250,36 @@ export default function DetailsScreen() {
         </Text>
 
         {/* Data e Hora */}
-        <View className="bg-surface border border-border rounded-lg p-4 mb-6">
-          <View className="flex-row items-center gap-3 mb-3">
-            <Text className="text-2xl">📅</Text>
-            <View>
-              <Text className="text-xs text-muted font-medium">Data</Text>
-              <Text className="text-sm font-semibold text-foreground">
-                {formattedDate}
-              </Text>
-            </View>
+        {(informativo.data_evento || informativo.hora_evento) && (
+          <View className="bg-surface border border-border rounded-xl p-4 mb-4">
+            {informativo.data_evento && (
+              <View className="flex-row items-center gap-3 mb-3">
+                <Text className="text-2xl">📅</Text>
+                <View>
+                  <Text className="text-xs text-muted font-medium">Data</Text>
+                  <Text className="text-sm font-semibold text-foreground">
+                    {formatarData()}
+                  </Text>
+                </View>
+              </View>
+            )}
+            {informativo.hora_evento && (
+              <View className="flex-row items-center gap-3">
+                <Text className="text-2xl">⏰</Text>
+                <View>
+                  <Text className="text-xs text-muted font-medium">Horário</Text>
+                  <Text className="text-sm font-semibold text-foreground">
+                    {informativo.hora_evento}
+                  </Text>
+                </View>
+              </View>
+            )}
           </View>
-          <View className="flex-row items-center gap-3">
-            <Text className="text-2xl">⏰</Text>
-            <View>
-              <Text className="text-xs text-muted font-medium">Horário</Text>
-              <Text className="text-sm font-semibold text-foreground">
-                {formattedTime}
-              </Text>
-            </View>
-          </View>
-        </View>
+        )}
 
         {/* Local */}
         {informativo.local && (
-          <View className="bg-surface border border-border rounded-lg p-4 mb-6">
+          <View className="bg-surface border border-border rounded-xl p-4 mb-4">
             <View className="flex-row items-center gap-3">
               <Text className="text-2xl">📍</Text>
               <View className="flex-1">
@@ -259,9 +292,21 @@ export default function DetailsScreen() {
           </View>
         )}
 
+        {/* Resumo */}
+        {informativo.resumo && (
+          <View className="mb-4">
+            <Text className="text-sm font-semibold text-muted uppercase mb-2">
+              Resumo
+            </Text>
+            <Text className="text-base text-foreground leading-relaxed">
+              {informativo.resumo}
+            </Text>
+          </View>
+        )}
+
         {/* Descrição */}
         <View className="mb-6">
-          <Text className="text-sm font-semibold text-muted uppercase mb-3">
+          <Text className="text-sm font-semibold text-muted uppercase mb-2">
             Descrição
           </Text>
           <Text className="text-base text-foreground leading-relaxed">
@@ -269,73 +314,35 @@ export default function DetailsScreen() {
           </Text>
         </View>
 
-        {/* Contato */}
-        {informativo.contato && (
-          <View className="bg-surface border border-border rounded-lg p-4 mb-6">
-            <Text className="text-sm font-semibold text-muted uppercase mb-3">
-              Contato
-            </Text>
-            <Text className="text-sm font-semibold text-foreground">
-              {informativo.contato.nome}
-            </Text>
-            {informativo.contato.email && (
-              <Text className="text-xs text-muted mt-1">
-                {informativo.contato.email}
-              </Text>
-            )}
-            {informativo.contato.telefone && (
-              <Text className="text-xs text-muted">
-                {informativo.contato.telefone}
-              </Text>
-            )}
-          </View>
-        )}
-
         {/* Ações */}
         <View className="gap-3 mb-8">
-          {informativo.requerConfirmacao && (
-            <ActionButton
-              label={confirmado ? '✓ Presença Confirmada' : 'Confirmar Presença'}
-              onPress={handleConfirmarPresenca}
-              variant={confirmado ? 'secondary' : 'primary'}
-              colors={colors}
-            />
-          )}
-
-          {informativo.requerAutorizacao && (
-            <ActionButton
-              label={
-                autorizacaoEnviada ? '✓ Autorização Enviada' : 'Enviar Autorização'
-              }
-              onPress={handleEnviarAutorizacao}
-              variant={autorizacaoEnviada ? 'secondary' : 'primary'}
-              colors={colors}
-            />
-          )}
+          <ActionButton
+            label={confirmado ? '✓ Presença Confirmada' : 'Confirmar Presença'}
+            onPress={handleConfirmarPresenca}
+            variant={confirmado ? 'secondary' : 'primary'}
+            disabled={confirmado}
+          />
 
           <ActionButton
-            label="Adicionar ao Calendário"
+            label={
+              autorizacaoEnviada ? '✓ Autorização Enviada' : 'Enviar Autorização'
+            }
+            onPress={handleEnviarAutorizacao}
+            variant={autorizacaoEnviada ? 'secondary' : 'primary'}
+            disabled={autorizacaoEnviada}
+          />
+
+          <ActionButton
+            label="📅 Adicionar ao Calendário"
             onPress={handleAdicionarCalendario}
             variant="secondary"
-            colors={colors}
           />
 
           <ActionButton
             label="💬 Fale com a Secretaria"
             onPress={handleFalarComSecretaria}
             variant="secondary"
-            colors={colors}
           />
-
-          {/* Admin Edit Button */}
-          {isAdmin && (
-            <ActionButton
-              label="✍️ Editar"
-              onPress={() => router.push(`/admin-edit?id=${informativo.id}`)}
-              variant="secondary"
-              colors={colors}
-            />
-          )}
         </View>
       </ScrollView>
     </ScreenContainer>

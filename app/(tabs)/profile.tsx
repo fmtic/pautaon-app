@@ -9,7 +9,7 @@ import { useAuth } from "@/lib/auth-context";
 export default function ProfileScreen() {
   const router = useRouter();
   const colors = useColors();
-  const { logout, usuario, alunos } = useAuth();
+  const { logout, usuario } = useAuth();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [emailNotifications, setEmailNotifications] = useState(true);
 
@@ -79,37 +79,7 @@ export default function ProfileScreen() {
             </View>
           </View>
 
-          {/* Alunos vinculados (apenas para responsáveis) */}
-          {usuario?.tipo_usuario !== "admin" && alunos.length > 0 && (
-            <View className="gap-3">
-              <Text className="text-sm font-semibold text-foreground">
-                {alunos.length === 1 ? "Aluno" : "Alunos"}
-              </Text>
-              {alunos.map((aluno) => (
-                <View key={aluno.id} className="bg-surface rounded-2xl p-4 gap-2">
-                  <View className="flex-row items-center gap-3">
-                    <View className="w-10 h-10 rounded-full bg-primary items-center justify-center">
-                      <Text className="text-xl">🎓</Text>
-                    </View>
-                    <View className="flex-1">
-                      <Text className="text-base font-semibold text-foreground">
-                        {aluno.nome}
-                      </Text>
-                      <Text className="text-xs text-muted mt-1">{aluno.serie}</Text>
-                    </View>
-                  </View>
-                  <View className="border-t border-border pt-2">
-                    <View className="flex-row items-center gap-2">
-                      <Text className="text-xs text-muted w-20">Matrícula:</Text>
-                      <Text className="text-sm text-foreground font-semibold">
-                        {aluno.matricula}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              ))}
-            </View>
-          )}
+
 
           {/* Notificações */}
           <View className="gap-3">

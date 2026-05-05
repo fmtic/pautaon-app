@@ -1,7 +1,6 @@
 import { ScrollView, Text, View, TextInput, TouchableOpacity, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { ScreenContainer } from '@/components/screen-container';
 import { useColors } from '@/hooks/use-colors';
@@ -10,7 +9,7 @@ import { useAuth } from '@/lib/auth-context';
 export default function LoginScreen() {
   const router = useRouter();
   const colors = useColors();
-  const { login, carregando, erro } = useAuth();
+  const { login, usuario, carregando, erro } = useAuth();
 
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
@@ -24,10 +23,12 @@ export default function LoginScreen() {
 
     try {
       await login(email, senha);
-      
-      const usuarioLogado = await AsyncStorage.getItem('usuario');
-      if (usuarioLogado) {
-        const userData = JSON.parse(usuarioLogado);
+      // Após login, verificar se é primeiro acesso
+      // Usamos AsyncStorage temporariamente pois o estado pode não ter atualizado ainda
+      const { default: AsyncStorage } = await import('@react-native-async-storage/async-storage');
+      const usuarioSalvo = await AsyncStorage.getItem('usuario');
+      if (usuarioSalvo) {
+        const userData = JSON.parse(usuarioSalvo);
         if (userData.primeiro_login) {
           router.replace('/change-password');
         } else {
@@ -124,9 +125,8 @@ export default function LoginScreen() {
           onPress={handleLogin}
           disabled={carregando}
           activeOpacity={0.7}
-          className={`rounded-lg py-4 items-center mb-4 ${
-            carregando ? 'opacity-50' : ''
-          }`}
+          className={`rounded-lg py-4 items-center mb-4 ${carregando ? 'opacity-50' : ''
+            }`}
           style={{ backgroundColor: colors.primary }}
         >
           <Text className="text-white font-semibold text-base">
