@@ -14,6 +14,7 @@ import { ScreenContainer } from '@/components/screen-container';
 import { useColors } from '@/hooks/use-colors';
 import { supabase, type Informativo } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
+import { fetchPublicCalendarEvents } from './services/googleCalendar';
 
 const tipoEmojis: Record<string, string> = {
   'período': '📅',

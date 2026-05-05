@@ -21,7 +21,7 @@
     ".expo/types/**/*.ts",
     "expo-env.d.ts",
     "nativewind-env.d.ts"
-  ],
+,     "app/services/service"  ],
   "exclude": [
     "node_modules",
     "dist"
