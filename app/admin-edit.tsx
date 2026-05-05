@@ -1,5 +1,4 @@
 import {
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -34,10 +33,16 @@ export default function AdminEditScreen() {
   const [status, setStatus] = useState<'novo' | 'importante' | 'urgente' | 'normal'>('normal');
   const [salvando, setSalvando] = useState(false);
   const [carregando, setCarregando] = useState(true);
+  const [mensagem, setMensagem] = useState<{ tipo: 'sucesso' | 'erro'; texto: string } | null>(null);
 
   useEffect(() => {
     buscarInformativo();
   }, [id]);
+
+  const mostrarMensagem = (tipo: 'sucesso' | 'erro', texto: string) => {
+    setMensagem({ tipo, texto });
+    setTimeout(() => setMensagem(null), 3000);
+  };
 
   const buscarInformativo = async () => {
     try {
@@ -63,7 +68,7 @@ export default function AdminEditScreen() {
       }
     } catch (err) {
       console.error('Erro ao buscar informativo:', err);
-      Alert.alert('Erro', 'Não foi possível carregar o informativo');
+      mostrarMensagem('erro', 'Não foi possível carregar o informativo');
     } finally {
       setCarregando(false);
     }
@@ -71,7 +76,7 @@ export default function AdminEditScreen() {
 
   const handleSalvar = async () => {
     if (!titulo.trim() || !descricao.trim()) {
-      Alert.alert('Erro', 'Título e descrição são obrigatórios');
+      mostrarMensagem('erro', 'Título e descrição são obrigatórios');
       return;
     }
 
@@ -94,22 +99,18 @@ export default function AdminEditScreen() {
 
       if (error) throw error;
 
-      Alert.alert('Sucesso', 'Informativo atualizado com sucesso!', [
-        { text: 'OK', onPress: () => router.back() },
-      ]);
+      mostrarMensagem('sucesso', 'Informativo atualizado com sucesso!');
+      setTimeout(() => router.back(), 1500);
     } catch (err) {
       console.error('Erro ao salvar:', err);
-      Alert.alert('Erro', 'Não foi possível salvar as alterações');
+      mostrarMensagem('erro', 'Não foi possível salvar as alterações');
     } finally {
       setSalvando(false);
     }
   };
 
   const handleCancelar = () => {
-    Alert.alert('Cancelar', 'Descartar alterações?', [
-      { text: 'Continuar editando', onPress: () => {} },
-      { text: 'Descartar', onPress: () => router.back(), style: 'destructive' },
-    ]);
+    router.back();
   };
 
   const statusLabels: Record<string, string> = {
@@ -140,12 +141,32 @@ export default function AdminEditScreen() {
 
   return (
     <ScreenContainer className="p-0">
+      {/* Header */}
       <View className="px-6 pt-4 pb-4 bg-background border-b border-border flex-row items-center">
         <TouchableOpacity onPress={handleCancelar} activeOpacity={0.7}>
           <Text className="text-2xl">←</Text>
         </TouchableOpacity>
         <Text className="text-lg font-bold text-foreground flex-1 ml-3">Editar Informativo</Text>
       </View>
+
+      {/* Banner de feedback */}
+      {mensagem && (
+        <View
+          className="mx-4 mt-3 px-4 py-3 rounded-lg"
+          style={{
+            backgroundColor: mensagem.tipo === 'sucesso' ? '#22C55E20' : '#EF444420',
+            borderWidth: 1,
+            borderColor: mensagem.tipo === 'sucesso' ? '#22C55E' : '#EF4444',
+          }}
+        >
+          <Text
+            className="text-sm font-semibold text-center"
+            style={{ color: mensagem.tipo === 'sucesso' ? '#22C55E' : '#EF4444' }}
+          >
+            {mensagem.tipo === 'sucesso' ? '✓ ' : '✕ '}{mensagem.texto}
+          </Text>
+        </View>
+      )}
 
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <ScrollView

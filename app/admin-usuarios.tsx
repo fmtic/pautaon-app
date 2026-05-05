@@ -1,5 +1,4 @@
 import {
-  Alert,
   FlatList,
   KeyboardAvoidingView,
   Modal,
@@ -10,7 +9,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useState, useEffect } from 'react';
 
@@ -25,13 +23,40 @@ type NovoUsuario = {
   tipo_usuario: 'admin' | 'responsavel';
 };
 
+type Mensagem = { tipo: 'sucesso' | 'erro'; texto: string } | null;
+
+function Banner({ mensagem }: { mensagem: Mensagem }) {
+  if (!mensagem) return null;
+  return (
+    <View
+      className="mx-4 mt-3 px-4 py-3 rounded-lg"
+      style={{
+        backgroundColor: mensagem.tipo === 'sucesso' ? '#22C55E20' : '#EF444420',
+        borderWidth: 1,
+        borderColor: mensagem.tipo === 'sucesso' ? '#22C55E' : '#EF4444',
+      }}
+    >
+      <Text
+        className="text-sm font-semibold text-center"
+        style={{ color: mensagem.tipo === 'sucesso' ? '#22C55E' : '#EF4444' }}
+      >
+        {mensagem.tipo === 'sucesso' ? '✓ ' : '✕ '}{mensagem.texto}
+      </Text>
+    </View>
+  );
+}
+
 export default function AdminUsuariosScreen() {
   const router = useRouter();
   const colors = useColors();
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [carregando, setCarregando] = useState(false);
   const [modalVisivel, setModalVisivel] = useState(false);
+  const [modalDeletar, setModalDeletar] = useState<Usuario | null>(null);
+  const [modalReset, setModalReset] = useState<{ usuario: Usuario; novaSenha: string } | null>(null);
   const [salvando, setSalvando] = useState(false);
+  const [mensagem, setMensagem] = useState<Mensagem>(null);
+  const [mensagemModal, setMensagemModal] = useState<Mensagem>(null);
 
   const [novoUsuario, setNovoUsuario] = useState<NovoUsuario>({
     nome: '',
@@ -44,6 +69,16 @@ export default function AdminUsuariosScreen() {
     buscarUsuarios();
   }, []);
 
+  const mostrarMensagem = (tipo: 'sucesso' | 'erro', texto: string) => {
+    setMensagem({ tipo, texto });
+    setTimeout(() => setMensagem(null), 4000);
+  };
+
+  const mostrarMensagemModal = (tipo: 'sucesso' | 'erro', texto: string) => {
+    setMensagemModal({ tipo, texto });
+    setTimeout(() => setMensagemModal(null), 4000);
+  };
+
   const buscarUsuarios = async () => {
     try {
       setCarregando(true);
@@ -51,12 +86,10 @@ export default function AdminUsuariosScreen() {
         .from('usuarios')
         .select('*')
         .order('nome');
-
       if (error) throw error;
       setUsuarios(data || []);
     } catch (err) {
-      console.error('Erro ao buscar usuários:', err);
-      Alert.alert('Erro', 'Não foi possível carregar usuários');
+      mostrarMensagem('erro', 'Não foi possível carregar usuários');
     } finally {
       setCarregando(false);
     }
@@ -64,20 +97,21 @@ export default function AdminUsuariosScreen() {
 
   const abrirModalCriar = () => {
     setNovoUsuario({ nome: '', email: '', senha_provisoria: '', tipo_usuario: 'responsavel' });
+    setMensagemModal(null);
     setModalVisivel(true);
   };
 
   const handleCriarUsuario = async () => {
     if (!novoUsuario.nome.trim()) {
-      Alert.alert('Erro', 'Nome é obrigatório');
+      mostrarMensagemModal('erro', 'Nome é obrigatório');
       return;
     }
     if (!novoUsuario.email.trim() || !novoUsuario.email.includes('@')) {
-      Alert.alert('Erro', 'Email inválido');
+      mostrarMensagemModal('erro', 'Email inválido');
       return;
     }
     if (!novoUsuario.senha_provisoria.trim() || novoUsuario.senha_provisoria.trim().length < 6) {
-      Alert.alert('Erro', 'Senha provisória deve ter ao menos 6 caracteres');
+      mostrarMensagemModal('erro', 'Senha provisória deve ter ao menos 6 caracteres');
       return;
     }
 
@@ -96,82 +130,66 @@ export default function AdminUsuariosScreen() {
 
       if (error) {
         if (error.code === '23505') {
-          Alert.alert('Erro', 'Este email já está cadastrado');
+          mostrarMensagemModal('erro', 'Este email já está cadastrado');
         } else {
           throw error;
         }
         return;
       }
 
-      Alert.alert('Sucesso', 'Usuário criado com sucesso!');
-      setModalVisivel(false);
-      buscarUsuarios();
+      mostrarMensagemModal('sucesso', 'Usuário criado com sucesso!');
+      setTimeout(() => {
+        setModalVisivel(false);
+        buscarUsuarios();
+      }, 1200);
     } catch (err) {
-      console.error('Erro ao criar usuário:', err);
-      Alert.alert('Erro', 'Não foi possível criar o usuário');
+      mostrarMensagemModal('erro', 'Não foi possível criar o usuário');
     } finally {
       setSalvando(false);
     }
   };
 
-  const handleDeletarUsuario = (usuario: Usuario) => {
-    Alert.alert(
-      'Deletar Usuário',
-      `Tem certeza que deseja deletar "${usuario.nome}"?`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Deletar',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const { error } = await supabase
-                .from('usuarios')
-                .delete()
-                .eq('id', usuario.id);
-
-              if (error) throw error;
-              Alert.alert('Sucesso', 'Usuário deletado');
-              buscarUsuarios();
-            } catch (err) {
-              Alert.alert('Erro', 'Não foi possível deletar o usuário');
-            }
-          },
-        },
-      ]
-    );
+  const handleDeletarUsuario = async () => {
+    if (!modalDeletar) return;
+    try {
+      const { error } = await supabase
+        .from('usuarios')
+        .delete()
+        .eq('id', modalDeletar.id);
+      if (error) throw error;
+      setModalDeletar(null);
+      mostrarMensagem('sucesso', `Usuário "${modalDeletar.nome}" deletado`);
+      buscarUsuarios();
+    } catch (err) {
+      setModalDeletar(null);
+      mostrarMensagem('erro', 'Não foi possível deletar o usuário');
+    }
   };
 
-  const handleResetarSenha = async (usuario: Usuario) => {
-    const novaSenha = Math.random().toString(36).slice(-8);
-    Alert.alert(
-      'Resetar Senha',
-      `A nova senha provisória será: ${novaSenha}\n\nDeseja continuar?`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Confirmar',
-          onPress: async () => {
-            try {
-              const { error } = await supabase
-                .from('usuarios')
-                .update({
-                  senha_provisoria: novaSenha,
-                  primeiro_login: true,
-                  atualizado_em: new Date().toISOString(),
-                })
-                .eq('id', usuario.id);
+  const handleResetarSenha = async () => {
+    if (!modalReset) return;
+    try {
+      const { error } = await supabase
+        .from('usuarios')
+        .update({
+          senha_provisoria: modalReset.novaSenha,
+          primeiro_login: true,
+          atualizado_em: new Date().toISOString(),
+        })
+        .eq('id', modalReset.usuario.id);
+      if (error) throw error;
+      setModalReset(null);
+      mostrarMensagem('sucesso', `Senha resetada! Nova senha: ${modalReset.novaSenha}`);
+      buscarUsuarios();
+    } catch (err) {
+      setModalReset(null);
+      mostrarMensagem('erro', 'Não foi possível resetar a senha');
+    }
+  };
 
-              if (error) throw error;
-              Alert.alert('Sucesso', `Senha resetada!\nNova senha: ${novaSenha}`);
-              buscarUsuarios();
-            } catch (err) {
-              Alert.alert('Erro', 'Não foi possível resetar a senha');
-            }
-          },
-        },
-      ]
-    );
+  const abrirModalReset = (usuario: Usuario) => {
+    const novaSenha = Math.random().toString(36).slice(-8);
+    setModalReset({ usuario, novaSenha });
   };
 
   return (
@@ -183,9 +201,12 @@ export default function AdminUsuariosScreen() {
         </TouchableOpacity>
         <Text className="text-3xl font-bold text-white">Usuários</Text>
         <Text className="text-sm text-white opacity-80 mt-1">
-          {usuarios.length} usuários cadastrados
+          {usuarios.length} usuário{usuarios.length !== 1 ? 's' : ''} cadastrado{usuarios.length !== 1 ? 's' : ''}
         </Text>
       </View>
+
+      {/* Banner de feedback */}
+      <Banner mensagem={mensagem} />
 
       {/* Botão Criar */}
       <View className="px-6 py-4 border-b border-border">
@@ -206,12 +227,12 @@ export default function AdminUsuariosScreen() {
         refreshing={carregando}
         contentContainerStyle={{ padding: 16 }}
         renderItem={({ item }) => (
-          <View className="bg-surface border border-border rounded-lg p-4 mb-3">
+          <View className="bg-surface border border-border rounded-xl p-4 mb-3">
             <View className="flex-row items-start justify-between">
               <View className="flex-1">
                 <Text className="text-base font-bold text-foreground">{item.nome}</Text>
                 <Text className="text-sm text-muted mt-1">{item.email}</Text>
-                <View className="flex-row items-center gap-2 mt-2">
+                <View className="flex-row items-center gap-2 mt-2 flex-wrap">
                   <View
                     className={`px-2 py-1 rounded-full ${
                       item.tipo_usuario === 'admin' ? 'bg-warning/20' : 'bg-primary/10'
@@ -238,18 +259,18 @@ export default function AdminUsuariosScreen() {
 
             <View className="flex-row gap-2 mt-4">
               <TouchableOpacity
-                onPress={() => handleResetarSenha(item)}
+                onPress={() => abrirModalReset(item)}
                 activeOpacity={0.7}
-                className="flex-1 bg-primary/10 rounded py-2 items-center"
+                className="flex-1 bg-primary/10 rounded-lg py-2 items-center"
               >
                 <Text className="text-primary font-semibold text-xs">🔑 Resetar Senha</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                onPress={() => handleDeletarUsuario(item)}
+                onPress={() => setModalDeletar(item)}
                 activeOpacity={0.7}
-                className="flex-1 bg-error/10 rounded py-2 items-center"
+                className="flex-1 bg-error/10 rounded-lg py-2 items-center"
               >
-                <Text className="text-error font-semibold text-xs">Deletar</Text>
+                <Text className="text-error font-semibold text-xs">🗑 Deletar</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -262,7 +283,7 @@ export default function AdminUsuariosScreen() {
         }
       />
 
-      {/* Modal Criar Usuário */}
+      {/* Modal: Criar Usuário */}
       <Modal
         visible={modalVisivel}
         animationType="slide"
@@ -271,10 +292,16 @@ export default function AdminUsuariosScreen() {
       >
         <View className="flex-1 bg-black/50 justify-end">
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-            <View className="bg-background rounded-t-3xl p-6">
-              <Text className="text-xl font-bold text-foreground mb-6">Novo Usuário</Text>
+            <View className="bg-background rounded-t-3xl p-6" style={{ maxHeight: '90%' }}>
+              <Text className="text-xl font-bold text-foreground mb-4">Novo Usuário</Text>
 
-              <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              <Banner mensagem={mensagemModal} />
+
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                style={{ marginTop: 12 }}
+              >
                 <View className="gap-4">
                   <View>
                     <Text className="text-sm font-semibold text-muted uppercase mb-2">Nome *</Text>
@@ -314,6 +341,9 @@ export default function AdminUsuariosScreen() {
                       className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
                       style={{ color: colors.foreground }}
                     />
+                    <Text className="text-xs text-muted mt-1">
+                      O usuário será solicitado a trocar no primeiro acesso
+                    </Text>
                   </View>
 
                   <View>
@@ -342,7 +372,7 @@ export default function AdminUsuariosScreen() {
                     </View>
                   </View>
 
-                  <View className="flex-row gap-3 mt-2">
+                  <View className="flex-row gap-3 mt-2 mb-4">
                     <TouchableOpacity
                       onPress={() => setModalVisivel(false)}
                       activeOpacity={0.7}
@@ -359,7 +389,7 @@ export default function AdminUsuariosScreen() {
                       }`}
                     >
                       <Text className="text-white font-semibold">
-                        {salvando ? 'Criando...' : 'Criar'}
+                        {salvando ? 'Criando...' : 'Criar Usuário'}
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -367,6 +397,84 @@ export default function AdminUsuariosScreen() {
               </ScrollView>
             </View>
           </KeyboardAvoidingView>
+        </View>
+      </Modal>
+
+      {/* Modal: Confirmar Deletar */}
+      <Modal
+        visible={!!modalDeletar}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setModalDeletar(null)}
+      >
+        <View className="flex-1 bg-black/50 items-center justify-center px-6">
+          <View className="bg-background rounded-2xl p-6 w-full">
+            <Text className="text-xl font-bold text-foreground mb-2">Deletar Usuário</Text>
+            <Text className="text-sm text-muted mb-6">
+              Tem certeza que deseja deletar{' '}
+              <Text className="font-semibold text-foreground">"{modalDeletar?.nome}"</Text>?
+              {'\n'}Esta ação não pode ser desfeita.
+            </Text>
+            <View className="flex-row gap-3">
+              <TouchableOpacity
+                onPress={() => setModalDeletar(null)}
+                activeOpacity={0.7}
+                className="flex-1 bg-surface border border-border rounded-lg py-3 items-center"
+              >
+                <Text className="text-foreground font-semibold">Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleDeletarUsuario}
+                activeOpacity={0.7}
+                className="flex-1 bg-error rounded-lg py-3 items-center"
+              >
+                <Text className="text-white font-semibold">Deletar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal: Confirmar Reset de Senha */}
+      <Modal
+        visible={!!modalReset}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setModalReset(null)}
+      >
+        <View className="flex-1 bg-black/50 items-center justify-center px-6">
+          <View className="bg-background rounded-2xl p-6 w-full">
+            <Text className="text-xl font-bold text-foreground mb-2">Resetar Senha</Text>
+            <Text className="text-sm text-muted mb-2">
+              A nova senha provisória de{' '}
+              <Text className="font-semibold text-foreground">"{modalReset?.usuario.nome}"</Text>{' '}
+              será:
+            </Text>
+            <View className="bg-surface border border-border rounded-lg px-4 py-3 mb-6 items-center">
+              <Text className="text-lg font-bold text-primary tracking-widest">
+                {modalReset?.novaSenha}
+              </Text>
+            </View>
+            <Text className="text-xs text-muted mb-6 text-center">
+              Anote esta senha antes de confirmar. O usuário precisará trocá-la no próximo acesso.
+            </Text>
+            <View className="flex-row gap-3">
+              <TouchableOpacity
+                onPress={() => setModalReset(null)}
+                activeOpacity={0.7}
+                className="flex-1 bg-surface border border-border rounded-lg py-3 items-center"
+              >
+                <Text className="text-foreground font-semibold">Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleResetarSenha}
+                activeOpacity={0.7}
+                className="flex-1 bg-primary rounded-lg py-3 items-center"
+              >
+                <Text className="text-white font-semibold">Confirmar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
       </Modal>
     </ScreenContainer>

@@ -57,6 +57,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const senhaArmazenada = (usuariosData.senha_provisoria || '').trim();
       const senhaNormalizada = senha.trim();
 
+      // LOG TEMPORÁRIO - remover depois
+      console.log('Email encontrado:', usuariosData.email);
+      console.log('Senha no banco:', JSON.stringify(senhaArmazenada));
+      console.log('Senha digitada:', JSON.stringify(senhaNormalizada));
+      console.log('São iguais?', senhaArmazenada === senhaNormalizada);
+
       if (senhaArmazenada !== senhaNormalizada) {
         throw new Error('Email ou senha incorretos');
       }
